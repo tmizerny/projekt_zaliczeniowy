@@ -7,7 +7,7 @@ import folium
 
 pn.extension()
 
-mapa_start = pn.pane.plot.Folium(folium.Map(location=[52.41579805, 16.931231975777052]))
+
 
 source_menu = pn.widgets.Select(description="Z jakiego źródła aplikacja ma pobrać dane?", name='Wybierz źródło danych',
                                 options=['Usługa REST', 'Baza danych'])
@@ -30,7 +30,7 @@ def zaladuj_dane(event):
 load_data_button = pn.widgets.Button(name='Załaduj dane')
 load_data_button.on_click(zaladuj_dane)
 
-station_menu_all = pn.widgets.Select(name='Wszystkie stacje pomiarowe ze źródła: ',disabled=True)
+station_menu_all = pn.widgets.Select(name='Wszystkie stacje pomiarowe ze źródła: ', disabled=True)
 
 city_input = pn.widgets.TextInput(
     name="Znajdź stację w konkretnej miejscowości: ",
@@ -39,9 +39,10 @@ city_input = pn.widgets.TextInput(
 
 
 def zaladuj_stacje_miejscowosc(event):
-    station_menu_city.options = [stacja['stationName'] for stacja in pobierz_dane(1) if
-                                 city_input.value in stacja['stationName'].split(',')[0]]
-    station_menu_city.disabled = False
+    if city_input.value:
+        station_menu_city.options = [stacja['stationName'] for stacja in pobierz_dane(1) if
+                                     city_input.value in stacja['stationName'].split(',')[0]]
+        station_menu_city.disabled = False
 
 
 button_input = pn.widgets.Button(name='Szukaj stacji dla konkretnej miejscowości 🔍', disabled=True)
@@ -54,31 +55,41 @@ localization = pn.widgets.TextInput(description='Wyszukaj stacje pomiarowe w pod
                                     placeholder='Wprowadź nazwę lokalizacji: ', disabled=True)
 distance = pn.widgets.TextInput(placeholder='Wprowadź promień wyszukiwania [w km]: ', disabled=True)
 
+mapa = None
 
-def zaznacz_na_mapie(miejsce=localization.value_input, promien=distance.value_input,
-                     lista_stacji=pobierz_dane(1)):
+def zaznacz_na_mapie(miejsce, promien,
+                     lista_stacji):
 
     promien = float(promien)
     centrum, wynik_lista, lokalizacje = najblizsze_stacje_pomiarowe(miejsce, promien, lista_stacji)
-    mapa = pn.pane.plot.Folium(folium.Map(location=centrum))
+    mapa = pn.pane.plot.Folium(folium.Map(location=centrum), width=250, height=250)
+
     for miejsce, koordynaty in lokalizacje.items():
         folium.Marker(koordynaty, popup=f'{miejsce}').add_to(mapa.object)
 
     folium.Circle(centrum, radius=promien, fill=True, fill_opacity=0.3, fill_color='yellowgreen').add_to(mapa.object)
 
 
+
+
 button_distance_input = pn.widgets.Button(name='Szukaj najbliższej stacji 🔍', disabled=True)
 button_distance_input.on_click(zaznacz_na_mapie)
 
 
-pn.template.FastListTemplate(
+
+# opis = pn.pane.Markdown()
+
+template = pn.template.FastListTemplate(
     title='Jakość powietrza w Polsce',
-    sidebar=[source_menu, load_data_button, station_menu_all, city_input, button_input, station_menu_city,
-             localization, distance, button_distance_input],
-    main=pn.Column(mapa_start, width=300),
+    sidebar=[source_menu, load_data_button, station_menu_all, pn.layout.Divider(), city_input, button_input,
+             station_menu_city,
+             pn.layout.Divider(), localization, distance, button_distance_input],
+    main=[pn.Row(pn.Card(), pn.Card(mapa, collapsible=True, title='Lokalizacja stacji', width=300, height=300))],
     background_color='#dcf5d0',
     header_background=' #00A170',
     accent_base_color='white',
     theme_toggle=False,
     busy_indicator=None
-).servable()
+)
+
+template.servable()
