@@ -1,7 +1,6 @@
 from geopy import geocoders, distance
-import folium
-import panel
-lokalizacja_stacji = {}
+
+
 def najblizsze_stacje_pomiarowe(miejsce_wyszukiwania, promien_wyszukiwania, lista_stacji):
     geolocator = geocoders.Nominatim(user_agent="Stacje pomiarowe")
     location = geolocator.geocode(miejsce_wyszukiwania)
@@ -9,6 +8,7 @@ def najblizsze_stacje_pomiarowe(miejsce_wyszukiwania, promien_wyszukiwania, list
 
     stacje_lista = []
     odleglosci_lista = []
+    lokalizacja_stacji = {}
 
     for stacja in lista_stacji:
         odleglosc = (distance.distance((centr_szerokosc, centr_dlugosc), (stacja['gegrLat'], stacja['gegrLon']))
@@ -16,11 +16,13 @@ def najblizsze_stacje_pomiarowe(miejsce_wyszukiwania, promien_wyszukiwania, list
         if odleglosc <= promien_wyszukiwania:
             stacje_lista.append(stacja['stationName'])
             odleglosci_lista.append(odleglosc)
+
             lokalizacja_stacji[stacja['stationName']] = [stacja['gegrLat'], stacja['gegrLon']]
+
     wynik_lista = list(zip(stacje_lista, odleglosci_lista))
     wynik_lista = sorted(wynik_lista, key=lambda x: x[1])
 
-    return [centr_szerokosc,centr_dlugosc],wynik_lista, lokalizacja_stacji
+    return [centr_szerokosc, centr_dlugosc], wynik_lista, lokalizacja_stacji
 
 
 
