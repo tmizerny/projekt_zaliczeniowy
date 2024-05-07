@@ -3,7 +3,7 @@ from pobieranie_danych import pobierz_dane
 from najblizsze_stacje import najblizsze_stacje_pomiarowe
 import pandas as pd
 import panel as pn
-import matplotlib.pyplot as plt
+
 import folium
 
 pn.extension()
@@ -42,7 +42,7 @@ city_input = pn.widgets.TextInput(
     disabled=True)
 
 
-def zaladuj_stacje_miejscowosc():
+def zaladuj_stacje_miejscowosc(event):
     if city_input.value:
         station_menu_city.options = [stacja['stationName'] for stacja in pobierz_dane(1) if
                                      city_input.value in stacja['stationName'].split(',')[0]]
@@ -112,8 +112,8 @@ number_max = pn.indicators.Number(name='Maksymalne stężenie', font_size='36pt'
 number_mean = pn.indicators.Number(name='Średnie stężenie', font_size='36pt')
 
 main_layout = pn.Column(
-    pn.Card(collapsible=True, title='Lokalizacja najbliższych stacji', width=800, height=500),
-    pn.Card(pn.Row(number_max, number_mean, number_min))
+    pn.Card(collapsible=True, title='Mapa lokalizacyjna', width=800, height=500),
+    pn.Card(pn.Row(parameters_select, plot_button,number_max, number_mean, number_min))
 )
 
 template = pn.template.FastListTemplate(
@@ -121,7 +121,7 @@ template = pn.template.FastListTemplate(
     sidebar=[source_menu, load_data_button, localization, distance, button_distance_input, pn.layout.Divider(),
              station_menu_all, city_input, button_input,
              station_menu_city, button_szukaj,
-             pn.layout.Divider(), parameters_select, plot_button],
+             ],
     main=[main_layout],
     background_color='#dcf5d0',
     header_background=' #00A170',
