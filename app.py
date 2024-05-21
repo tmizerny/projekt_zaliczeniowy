@@ -3,7 +3,7 @@ from pobieranie_danych import pobierz_dane
 from najblizsze_stacje import najblizsze_stacje_pomiarowe
 import pandas as pd
 import panel as pn
-
+import hvplot.pandas
 import folium
 
 pn.extension()
@@ -69,12 +69,37 @@ def wczytaj_dane_dla_stacji(event):
     for czujnik in lista_czujnikow:
         fig_title = (pobierz_dane(3, czujnik['id'])['key'])
 
-        wszystkie_dataframy[fig_title] = pd.DataFrame((pobierz_dane(3, czujnik['id'])['values'])).fillna(0)
-        print(wszystkie_dataframy[fig_title])
+        df = pd.DataFrame((pobierz_dane(3, czujnik['id'])['values'])).fillna(0)
+        df['date'] = pd.to_datetime(df['date'])
+        df = df.set_index('date')
+        df['Data i godzina odczytu'] = df.index.strftime('%H:%M %d/%m/%Y')
+        df = df[::-1]
+
+        wszystkie_dataframy[fig_title] = df
+
     parameters_select.options = [*wszystkie_dataframy.keys()]
     parameters_select.disabled = False
-    plot_button.disabled = False
+    button_wykres.disabled = False
 
+parameters_select = pn.widgets.Select(name='Wybierz parametr do pokazania na wykresie', disabled=True)
+
+def stworz_wykres(df):
+    return df.hvplot.bar(x='Data i godzina odczytu').opts(xrotation=60)
+
+def aktualizuj_wykres(event):
+    df = wszystkie_dataframy[parameters_select.value]
+    wykres = stworz_wykres(df)
+    suwak = pn.widgets.DateRangeSlider(name='Data', start=df.index.min().date(),
+                                                end=df.index.max().date(), value=(df.index.min().date(),
+                                                                                  df.index.max().date()))
+    main_layout[2] = wykres
+    main_layout[3] = suwak
+
+    @pn.depends(suwak.param.value)
+    def aktualizuj_wykres(date_range):
+        start_date, end_date = date_range
+        filtered_df = df[(df.index >= pd.Timestamp(start_date)) & (df.index <= pd.Timestamp(end_date))]
+        return aktualizuj_wykres(filtered_df)
 
 button_szukaj = pn.widgets.Button(name='Wyszukaj dane dla stacji')
 button_szukaj.on_click(wczytaj_dane_dla_stacji)
@@ -87,7 +112,8 @@ def stworz_mape(location, promien):
     mapa = pn.pane.plot.Folium(folium.Map(location=centrum), width=700, height=350)
     for miejsce, koordynaty in lokalizacje.items():
         folium.Marker(koordynaty, popup=f'{miejsce}').add_to(mapa.object)
-    folium.Circle(centrum, radius=promien * 1000, fill=True, fill_opacity=0.3, fill_color='yellowgreen').add_to(
+    folium.Circle(centrum, radius=promien * 1000, fill=True, fill_opacity=0.3, fill_color='yellowgreen',
+                  tooltip='Lokalizacja najbliższych stacji pomiarowych').add_to(
         mapa.object)
 
     return mapa
@@ -104,17 +130,22 @@ def aktualizuj_mape(event):
 button_distance_input = pn.widgets.Button(name='Szukaj najbliższej stacji 🔍', disabled=True)
 button_distance_input.on_click(aktualizuj_mape)
 
-parameters_select = pn.widgets.Select(name='Wybierz parametr do pokazania na wykresie', disabled=True)
-plot_button = pn.widgets.Button(name='Aktualizuj wykres', disabled=True)
+button_wykres = pn.widgets.Button(name='Aktualizuj wykres',disabled=True)
+button_wykres.on_click(aktualizuj_wykres)
 
-number_min = pn.indicators.Number(name='Minimalne stężenie', font_size='36pt')
-number_max = pn.indicators.Number(name='Maksymalne stężenie', font_size='36pt')
-number_mean = pn.indicators.Number(name='Średnie stężenie', font_size='36pt')
+number_min = pn.indicators.Number(name='Minimalne stężenie', font_size='14pt')
+number_max = pn.indicators.Number(name='Maksymalne stężenie', font_size='14pt')
+number_mean = pn.indicators.Number(name='Średnie stężenie', font_size='14pt')
+
+
+
+
 
 main_layout = pn.Column(
-    pn.Card(collapsible=True, title='Mapa lokalizacyjna', width=800, height=500),
-    pn.Card(pn.Row(parameters_select, plot_button,number_max, number_mean, number_min))
-)
+    pn.Column(),
+    pn.Card(pn.Column(pn.Row(parameters_select,button_wykres),pn.Row(number_max,number_mean,number_min),
+
+),title='Dane stacji'),pn.Row(),pn.Row())
 
 template = pn.template.FastListTemplate(
     title='Jakość powietrza w Polsce',
