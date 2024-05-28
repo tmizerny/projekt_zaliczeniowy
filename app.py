@@ -5,6 +5,7 @@ import pandas as pd
 import panel as pn
 import hvplot.pandas
 import folium
+import pprint
 
 pn.extension()
 
@@ -14,6 +15,10 @@ source_menu = pn.widgets.Select(description="Z jakiego źródła aplikacja ma po
 
 def wczytaj_wszystkie_stacje():
     return {stacja['stationName']: stacja['id'] for stacja in pobierz_dane(1)}
+
+
+def wczytaj_wszystkie_lokalizacje():
+    return {stacja['stationName']: [stacja['gegrLat'], stacja['gegrLon']] for stacja in pobierz_dane(1)}
 
 
 def zaladuj_dane(event):
@@ -64,10 +69,11 @@ wszystkie_dataframy = {}
 
 def wczytaj_dane_dla_stacji(event):
     stacje = wczytaj_wszystkie_stacje()
-    id_zapytania = stacje.get(station_menu_all.value)
+    id_zapytania = stacje.get(station_menu_city.value)
     lista_czujnikow = pobierz_dane(2, id_zapytania)
+    pprint.pprint(lista_czujnikow)
     for czujnik in lista_czujnikow:
-        fig_title = (pobierz_dane(3, czujnik['id'])['key'])
+        fig_title = f'{czujnik['param']['paramCode']} - {czujnik['param']['paramName']}'
 
         df = pd.DataFrame((pobierz_dane(3, czujnik['id'])['values'])).fillna(0)
         df['date'] = pd.to_datetime(df['date'])
@@ -79,32 +85,72 @@ def wczytaj_dane_dla_stacji(event):
 
     parameters_select.options = [*wszystkie_dataframy.keys()]
     parameters_select.disabled = False
-    button_wykres.disabled = False
+    button_panel.disabled = False
 
 
 parameters_select = pn.widgets.Select(name='Wybierz parametr do pokazania na wykresie', disabled=True)
 
-number_min = pn.indicators.Number(name='Minimalne stężenie', font_size='14pt',title_size='14pt')
-number_max = pn.indicators.Number(name='Maksymalne stężenie', font_size='14pt',title_size='14pt')
-number_mean = pn.indicators.Number(name='Średnie stężenie', font_size='14pt',title_size='14pt')
+number_min = pn.indicators.Number(name='Minimalne stężenie', font_size='14pt', title_size='14pt')
+number_max = pn.indicators.Number(name='Maksymalne stężenie', font_size='14pt', title_size='14pt')
+number_mean = pn.indicators.Number(name='Średnie stężenie', font_size='14pt', title_size='14pt')
+trend = pn.indicators.Trend(name='Trend paramentru', data={}, width=200, height=200)
+
 
 def aktualizuj_parametry(df):
-    parametry = [wartosc for wartosc in df['value'] if wartosc !=0]
+    parametry = [wartosc for wartosc in df['value'] if wartosc != 0]
 
-    number_min.value = round(min(parametry),2)
-    number_max.value = round(max(parametry),2)
-    number_mean.value = round(sum(parametry)/len(parametry),2)
+    number_min.value = round(min(parametry), 2)
+    number_max.value = round(max(parametry), 2)
+    number_mean.value = round(sum(parametry) / len(parametry), 2)
+
+
+def stworz_mape_najbliższe(location, promien):
+    promien = float(promien)
+    centrum, wynik_lista, lokalizacje = najblizsze_stacje_pomiarowe(location, promien, pobierz_dane(1))
+
+    mapa = pn.pane.plot.Folium(folium.Map(location=centrum), width=700, height=350)
+    for miejsce, koordynaty in lokalizacje.items():
+        folium.Marker(koordynaty, popup=f'{miejsce}').add_to(mapa.object)
+    folium.Circle(centrum, radius=promien * 1000, fill=True, fill_opacity=0.3, fill_color='yellowgreen',
+                  tooltip='Lokalizacja najbliższych stacji pomiarowych').add_to(mapa.object)
+    folium.Marker(centrum, location, icon=folium.Icon(color='red', )).add_to(mapa.object)
+
+    return mapa
+
+
+def aktualizuj_mape(event):
+    location = localization.value_input
+    promien = distance.value_input
+
+    mapa = stworz_mape_najbliższe(location, promien)
+    main_layout[0] = mapa
+
 
 def stworz_wykres(df):
-    return df.hvplot.bar(x='Data i godzina odczytu',color="teal").opts(xrotation=60)
+    return df.hvplot.bar(x='Data i godzina odczytu', color="teal").opts(xrotation=60,
+                                                                                               height=600,
+                                                                                               width=1000,
+                                                                                               align='center')
 
 
-def aktualizuj_wykres(event):
+def aktualizuj_panel(event):
     df = wszystkie_dataframy[parameters_select.value]
 
-    suwak = pn.widgets.DateRangeSlider(name='Data', start=df.index.min().date(),
-                                       end=df.index.max().date(), value=(df.index.min().date(),
-                                                                         df.index.max().date()))
+    suwak = pn.widgets.DatetimeRangeSlider(
+        name='Data',
+        start=df.index.min(),
+        end=df.index.max(),
+        value=(df.index.min(), df.index.max()),
+        step=3600000,
+        align='center'
+    )
+
+    lokalizacje = wczytaj_wszystkie_lokalizacje()
+    lokalizacja_stacji = lokalizacje.get(station_menu_city.value)
+    mapa = pn.pane.plot.Folium(folium.Map(location=lokalizacja_stacji), width=700, height=350)
+    folium.Marker(lokalizacja_stacji, popup=f'{station_menu_city.value}', icon=folium.Icon(color='red', )).add_to(
+        mapa.object)
+    main_layout[0] = mapa
 
     @pn.depends(suwak.param.value)
     def aktualizacja_wykresu(date_range):
@@ -120,44 +166,16 @@ def aktualizuj_wykres(event):
 button_szukaj = pn.widgets.Button(name='Wyszukaj dane dla stacji')
 button_szukaj.on_click(wczytaj_dane_dla_stacji)
 
-
-def stworz_mape(location, promien):
-    promien = float(promien)
-    centrum, wynik_lista, lokalizacje = najblizsze_stacje_pomiarowe(location, promien, pobierz_dane(1))
-
-    mapa = pn.pane.plot.Folium(folium.Map(location=centrum), width=700, height=350)
-    for miejsce, koordynaty in lokalizacje.items():
-        folium.Marker(koordynaty, popup=f'{miejsce}').add_to(mapa.object)
-    folium.Circle(centrum, radius=promien * 1000, fill=True, fill_opacity=0.3, fill_color='yellowgreen',
-                  tooltip='Lokalizacja najbliższych stacji pomiarowych').add_to(
-        mapa.object)
-
-    return mapa
-
-
-def aktualizuj_mape(event):
-    location = localization.value_input
-    promien = distance.value_input
-
-    mapa = stworz_mape(location, promien)
-    main_layout[0] = mapa
-
-
 button_distance_input = pn.widgets.Button(name='Szukaj najbliższej stacji 🔍', disabled=True)
 button_distance_input.on_click(aktualizuj_mape)
 
-button_wykres = pn.widgets.Button(name='Aktualizuj wykres', disabled=True)
-button_wykres.on_click(aktualizuj_wykres)
-
-
-
+button_panel = pn.widgets.Button(name='Aktualizuj panel', disabled=True)
+button_panel.on_click(aktualizuj_panel)
 
 main_layout = pn.Column(
     pn.Column(),
-    pn.Card(pn.Column(pn.Row(parameters_select, button_wykres),
-                      pn.Row(number_max, number_mean, number_min),
-
-                      ), title='Dane stacji'), pn.Row(), pn.Row())
+    pn.Card(pn.Column(pn.Row(parameters_select, button_panel),
+                      pn.Row(number_max, number_mean, number_min), ), title='Dane stacji'), pn.Row(), pn.Row())
 
 template = pn.template.FastListTemplate(
     title='Jakość powietrza w Polsce',

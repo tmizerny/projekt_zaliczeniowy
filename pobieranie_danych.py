@@ -24,7 +24,6 @@ def pobierz_dane(option, index=None):
         http_error_message = f'[{http_error}] Błąd protokołu HTTP'
     except requests.exceptions.ConnectionError as connection_error:
         connection_error_message = f'Brak połącznia z serwisem GIOS '
-
     except requests.exceptions.Timeout as timeout_error:
         timeout_error_message = f'[{timeout_error}] Błąd odpowiedz od serwera '
     else:
