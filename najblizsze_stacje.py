@@ -1,7 +1,6 @@
 from geopy import geocoders, distance
 
-
-def najblizsze_stacje_pomiarowe(miejsce_wyszukiwania, promien_wyszukiwania, lista_stacji):
+def najblizsze_stacje_pomiarowe(miejsce_wyszukiwania, promien_wyszukiwania, stacje_dict):
     geolocator = geocoders.Nominatim(user_agent="Stacje pomiarowe")
     location = geolocator.geocode(miejsce_wyszukiwania)
     centr_szerokosc, centr_dlugosc = location.latitude, location.longitude
@@ -10,14 +9,14 @@ def najblizsze_stacje_pomiarowe(miejsce_wyszukiwania, promien_wyszukiwania, list
     odleglosci_lista = []
     lokalizacja_stacji = {}
 
-    for stacja in lista_stacji:
-        odleglosc = (distance.distance((centr_szerokosc, centr_dlugosc), (stacja['gegrLat'], stacja['gegrLon']))
+    for nazwa, lokalizacja in stacje_dict.items():
+        odleglosc = (distance.distance((centr_szerokosc, centr_dlugosc), (lokalizacja[0],lokalizacja[1]))
                      .kilometers)
         if odleglosc <= promien_wyszukiwania:
-            stacje_lista.append(stacja['stationName'])
+            stacje_lista.append(nazwa)
             odleglosci_lista.append(odleglosc)
 
-            lokalizacja_stacji[stacja['stationName']] = [stacja['gegrLat'], stacja['gegrLon']]
+            lokalizacja_stacji[nazwa] = lokalizacja
 
     wynik_lista = list(zip(stacje_lista, odleglosci_lista))
     wynik_lista = sorted(wynik_lista, key=lambda x: x[1])

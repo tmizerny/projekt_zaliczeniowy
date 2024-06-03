@@ -1,6 +1,7 @@
 
 from pobieranie_danych import pobierz_dane
 from najblizsze_stacje import najblizsze_stacje_pomiarowe
+from baza_danych import *
 import pandas as pd
 import panel as pn
 import hvplot.pandas
@@ -19,26 +20,39 @@ def wczytaj_wszystkie_stacje():
 def wczytaj_wszystkie_lokalizacje():
     return {stacja['stationName']: [stacja['gegrLat'], stacja['gegrLon']] for stacja in pobierz_dane(1)}
 
+station_menu_all = pn.widgets.Select(name='Wszystkie stacje pomiarowe ze źródła: ', disabled=True)
 
+stacje_pomiarowe = {}
+wszystkie_lokalizacje ={}
 def zaladuj_dane(event):
+    global stacje_pomiarowe
+    global wszystkie_lokalizacje
+    wszystkie_lokalizacje.clear()
+    stacje_pomiarowe.clear()
     if source_menu.value == 'Usługa REST':
         stacje_pomiarowe = wczytaj_wszystkie_stacje()
         station_menu_all.options = [*stacje_pomiarowe.keys()]
-        station_menu_all.disabled = False
-        city_input.disabled = False
-        localization.disabled = False
-        distance.disabled = False
-        button_input.disabled = False
-        button_distance_input.disabled = False
-    else:
-        ...
-    # Załadowanie danych z bazy danych
+        station_menu_all.name = 'Wszystkie stacje pomiarowe z Usługi REST'
+        wszystkie_lokalizacje = wczytaj_wszystkie_lokalizacje()
+
+    elif source_menu.value == 'Baza danych':
+        stacje_pomiarowe = {stacja[0]: stacja[1] for stacja in pobierz_wszystkie_stacje()}
+        station_menu_all.options = [*stacje_pomiarowe.keys()]
+        station_menu_all.name = 'Wszystkie stacje pomiarowe z bazy danych'
+        wszystkie_lokalizacje = pobierz_wszystkie_stacje_lokalizacja()
+
+    station_menu_all.disabled = False
+    city_input.disabled = False
+    localization.disabled = False
+    distance.disabled = False
+    button_input.disabled = False
+    button_distance_input.disabled = False
 
 
 load_data_button = pn.widgets.Button(name='Załaduj dane')
 load_data_button.on_click(zaladuj_dane)
 
-station_menu_all = pn.widgets.Select(name='Wszystkie stacje pomiarowe ze źródła: ', disabled=True)
+
 
 city_input = pn.widgets.TextInput(
     name="Znajdź stację w konkretnej miejscowości: ",
@@ -48,8 +62,8 @@ city_input = pn.widgets.TextInput(
 
 def zaladuj_stacje_miejscowosc(event):
     if city_input.value:
-        station_menu_city.options = [stacja['stationName'] for stacja in pobierz_dane(1) if
-                                     city_input.value in stacja['stationName'].split(',')[0]]
+        station_menu_city.options = [nazwa for nazwa, id in stacje_pomiarowe.items() if
+                                    city_input.value in nazwa.split(',')[0]]
         station_menu_city.disabled = False
 
 
@@ -69,44 +83,51 @@ opis = ''
 
 
 def wczytaj_dane_dla_stacji(event):
+    global opis
     wszystkie_dataframy.clear()
     indeksy_stacji.clear()
-    wybrana_stacja = [stacja for stacja in pobierz_dane(1) if stacja['stationName'] == station_menu_city.value][0]
+    opis = ''
 
+    wybrana_stacja = [[nazwa, id] for nazwa, id in stacje_pomiarowe.items() if nazwa == station_menu_city.value][0]
+    lokalizacja_wybranej_stacji = [kordynaty for nazwa, kordynaty in wszystkie_lokalizacje.items() if nazwa == station_menu_city.value][0]
+    print(lokalizacja_wybranej_stacji)
     opis = f'Podstawowe informacje dla znalezionej stacji: \n' \
-           f'Nazwa stacji {wybrana_stacja['stationName']} \n' \
-           f'Numer id stacji: {wybrana_stacja['id']} \n'f'Lokalizacja wybranej stacji (współrzędne): [{wybrana_stacja['gegrLat']}, {wybrana_stacja['gegrLon']}]\n' \
-           f'Link do trasy na Google Maps: https://www.google.com/maps/dir/?api=1&destination={wybrana_stacja['gegrLat']},{wybrana_stacja['gegrLon']} \n' \
-           f'Lista czujników dostępnych dla stacji: \n'
-
-    stacje = wczytaj_wszystkie_stacje()
+           f'Nazwa stacji {wybrana_stacja[0]} \n' \
+           f'Numer id stacji: {wybrana_stacja[1]} \n' \
+           # f'Link do trasy na Google Maps: https://www.google.com/maps/dir/?api=1&destination={lokalizacja_wybranej_stacji[0]},{lokalizacja_wybranej_stacji[1]} \n' \
+           # f'Lista czujników dostępnych dla stacji: \n'
+    stacje = stacje_pomiarowe
     id_zapytania = stacje.get(station_menu_city.value)
-    lista_czujnikow = pobierz_dane(2, id_zapytania)
-    lista_indeksow = pobierz_dane(4, id_zapytania)
-    for czujnik in lista_czujnikow:
-        fig_title = czujnik['param']['paramCode']
 
-        opis += f'* {czujnik['param']['paramCode']} - {czujnik['param']['paramName']}\n'
+    if source_menu.value == 'Usługa REST':
 
-        df = pd.DataFrame((pobierz_dane(3, czujnik['id'])['values'])).fillna(0)
-        df['date'] = pd.to_datetime(df['date'])
-        df = df.set_index('date')
-        df['Data i godzina odczytu'] = df.index.strftime('%H:%M %d/%m/%Y')
-        df = df[::-1]
-        wszystkie_dataframy[fig_title] = df
+        lista_czujnikow = pobierz_dane(2, id_zapytania)
+        lista_indeksow = pobierz_dane(4, id_zapytania)
+        for czujnik in lista_czujnikow:
+            fig_title = czujnik['param']['paramCode']
 
-    for indeksy, slownik in lista_indeksow.items():
-        if 'IndexLevel' in indeksy:
-            if slownik is None:
-                continue
-            else:
-                indeksy_stacji[indeksy] = slownik
+            opis += f'* {czujnik['param']['paramCode']} - {czujnik['param']['paramName']}\n'
 
+            df = pd.DataFrame((pobierz_dane(3, czujnik['id'])['values'])).fillna(0)
+            df['date'] = pd.to_datetime(df['date'])
+            df = df.set_index('date')
+            df['Data i godzina odczytu'] = df.index.strftime('%H:%M %d/%m/%Y')
+            df = df[::-1]
+            wszystkie_dataframy[fig_title] = df
+
+        for indeksy, slownik in lista_indeksow.items():
+            if 'IndexLevel' in indeksy:
+                if slownik is None:
+                    continue
+                else:
+                    indeksy_stacji[indeksy] = slownik
+    elif source_menu.value == 'Baza danych':
+        ...
 
     parameters_select.options = [*wszystkie_dataframy.keys()]
     parameters_select.disabled = False
     button_panel.disabled = False
-    main_layout[1] = pn.pane.Markdown(opis)
+
 
 
 parameters_select = pn.widgets.Select(name='Wybierz parametr do pokazania na wykresie', disabled=True)
@@ -147,7 +168,7 @@ def aktualizuj_parametry(df):
 
 def stworz_mape_najbliższe(location, promien):
     promien = float(promien)
-    centrum, wynik_lista, lokalizacje = najblizsze_stacje_pomiarowe(location, promien, pobierz_dane(1))
+    centrum, wynik_lista, lokalizacje = najblizsze_stacje_pomiarowe(location, promien, stacje_pomiarowe)
 
     mapa = pn.pane.plot.Folium(folium.Map(location=centrum,zoom_start=1200), width=700, height=350, sizing_mode="stretch_width")
     for miejsce, koordynaty in lokalizacje.items():
@@ -196,7 +217,7 @@ def aktualizuj_panel(event):
     df = wszystkie_dataframy[parameters_select.value]
 
     suwak = pn.widgets.DatetimeRangeSlider(
-        name='Przedział daty i godziny odczytów',
+        name='Data i czas: ',
         start=df.index.min(),
         end=df.index.max(),
         value=(df.index.min(), df.index.max()),
@@ -212,7 +233,7 @@ def aktualizuj_panel(event):
                                             f'Lokalizacja {lokalizacja_stacji}',
                   icon=folium.Icon(color='red', )).add_to(mapa.object)
     main_layout[0] = mapa
-
+    main_layout[1] = pn.pane.Markdown(opis)
     @pn.depends(suwak.param.value)
     def aktualizacja_wykresu(date_range):
         start_date, end_date = date_range
