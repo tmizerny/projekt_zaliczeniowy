@@ -10,7 +10,7 @@ def najblizsze_stacje_pomiarowe(miejsce_wyszukiwania, promien_wyszukiwania, stac
     lokalizacja_stacji = {}
 
     for nazwa, lokalizacja in stacje_dict.items():
-        odleglosc = (distance.distance((centr_szerokosc, centr_dlugosc), (lokalizacja[0],lokalizacja[1]))
+        odleglosc = (distance.distance((centr_szerokosc, centr_dlugosc), lokalizacja)
                      .kilometers)
         if odleglosc <= promien_wyszukiwania:
             stacje_lista.append(nazwa)

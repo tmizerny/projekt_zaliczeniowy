@@ -94,8 +94,8 @@ def wczytaj_dane_dla_stacji(event):
     opis = f'Podstawowe informacje dla znalezionej stacji: \n' \
            f'Nazwa stacji {wybrana_stacja[0]} \n' \
            f'Numer id stacji: {wybrana_stacja[1]} \n' \
-           # f'Link do trasy na Google Maps: https://www.google.com/maps/dir/?api=1&destination={lokalizacja_wybranej_stacji[0]},{lokalizacja_wybranej_stacji[1]} \n' \
-           # f'Lista czujników dostępnych dla stacji: \n'
+           f'Link do trasy na Google Maps: https://www.google.com/maps/dir/?api=1&destination={lokalizacja_wybranej_stacji[0]},{lokalizacja_wybranej_stacji[1]} \n' \
+           f'Lista czujników dostępnych dla stacji: \n'
     stacje = stacje_pomiarowe
     id_zapytania = stacje.get(station_menu_city.value)
 
@@ -168,7 +168,7 @@ def aktualizuj_parametry(df):
 
 def stworz_mape_najbliższe(location, promien):
     promien = float(promien)
-    centrum, wynik_lista, lokalizacje = najblizsze_stacje_pomiarowe(location, promien, stacje_pomiarowe)
+    centrum, wynik_lista, lokalizacje = najblizsze_stacje_pomiarowe(location, promien, wszystkie_lokalizacje)
 
     mapa = pn.pane.plot.Folium(folium.Map(location=centrum,zoom_start=1200), width=700, height=350, sizing_mode="stretch_width")
     for miejsce, koordynaty in lokalizacje.items():
@@ -213,7 +213,8 @@ def stworz_wykres(df):
     line_plot = trend_df.hvplot.line(x='Data i godzina odczytu', y='Trend', color='red')
 
     return wykres_bar * line_plot
-def aktualizuj_panel(event):
+
+def aktualizuj_panel(event=None):
     df = wszystkie_dataframy[parameters_select.value]
 
     suwak = pn.widgets.DatetimeRangeSlider(
@@ -234,8 +235,9 @@ def aktualizuj_panel(event):
                   icon=folium.Icon(color='red', )).add_to(mapa.object)
     main_layout[0] = mapa
     main_layout[1] = pn.pane.Markdown(opis)
-    @pn.depends(suwak.param.value)
-    def aktualizacja_wykresu(date_range):
+
+    @pn.depends(suwak.param.value, parameters_select.param.value)
+    def aktualizacja_wykresu(date_range, param_value):
         start_date, end_date = date_range
         filtered_df = df[(df.index >= pd.Timestamp(start_date)) & (df.index <= pd.Timestamp(end_date))]
         aktualizuj_parametry(filtered_df)
@@ -245,18 +247,19 @@ def aktualizuj_panel(event):
     main_layout[4] = suwak
 
 
+parameters_select.param.watch(aktualizuj_panel, 'value')
+
 button_szukaj = pn.widgets.Button(name='Wyszukaj dane dla stacji 🔍')
 button_szukaj.on_click(wczytaj_dane_dla_stacji)
 
 button_distance_input = pn.widgets.Button(name='Szukaj najbliższej stacji 🔍', disabled=True)
 button_distance_input.on_click(aktualizuj_mape)
 
-button_panel = pn.widgets.Button(name='Aktualizuj panel', disabled=True)
-button_panel.on_click(aktualizuj_panel)
+
 
 main_layout = pn.Column(
     pn.Column(), pn.Row(),
-    pn.Card(pn.Column(pn.Row(parameters_select, button_panel),
+    pn.Card(pn.Column(pn.Row(parameters_select),
                       pn.Row(number_max, number_mean, number_min, indeks_stacji, indeks_parametru),
                       ),
             title='Dane panelu', sizing_mode="stretch_width"),
