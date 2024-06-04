@@ -53,19 +53,19 @@ def dodaj_parametr(cur: sqlite3.Cursor, id_stacji: int, paramCode: str, paramNam
         """
     cur.execute(sql_insert, (id_stacji, paramCode, paramName))
 
-with sqlite3.connect('baza_danych.db') as conn:
-    cur = conn.cursor()
-    rob_tabele_stacji(cur)
-    rob_tabele_parametry(cur)
-    for nazwa, id_stacji in stacje_dict.items():
-        szerokosc, dlugosc = lokalizacje[nazwa]
-        dodaj_stacje(cur, nazwa, id_stacji, szerokosc, dlugosc)
-        lista_czujnikow = pobierz_dane(2, id_stacji)
-
-        for parametr in lista_czujnikow:
-            paramCode = parametr['param']['paramCode']
-            paramName = parametr['param']['paramName']
-            dodaj_parametr(cur, id_stacji, paramCode, paramName)
+# with sqlite3.connect('baza_danych.db') as conn:
+#     cur = conn.cursor()
+#     rob_tabele_stacji(cur)
+#     rob_tabele_parametry(cur)
+#     for nazwa, id_stacji in stacje_dict.items():
+#         szerokosc, dlugosc = lokalizacje[nazwa]
+#         dodaj_stacje(cur, nazwa, id_stacji, szerokosc, dlugosc)
+#         lista_czujnikow = pobierz_dane(2, id_stacji)
+#
+#         for parametr in lista_czujnikow:
+#             paramCode = parametr['param']['paramCode']
+#             paramName = parametr['param']['paramName']
+#             dodaj_parametr(cur, id_stacji, paramCode, paramName)
 
     conn.commit()
 
@@ -83,11 +83,11 @@ def pobierz_wszystkie_stacje_lokalizacja():
         return {stacja[0]:[stacja[1],stacja[2]] for stacja in stacje_lok}
 
 
-def pobierz_wszystkie_parametry():
-    with sqlite3.connect('baza_danych.db') as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM parametry")
-        return cur.fetchall()
+# def pobierz_wszystkie_parametry():
+#     with sqlite3.connect('baza_danych.db') as conn:
+#         cur = conn.cursor()
+#         cur.execute("SELECT * FROM parametry")
+#         return cur.fetchall()
 
 
 # print(pobierz_wszystkie_parametry())
