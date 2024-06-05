@@ -1,13 +1,50 @@
+
 from najblizsze_stacje import najblizsze_stacje_pomiarowe
-from baza_danych import *
-import pandas as pd
+
+
 import panel as pn
-from widgety import *
-import hvplot.pandas
+import pandas as pd
+import requests
 import folium
 import numpy as np
+import hvplot.pandas
 
 pn.extension()
+
+
+def pobierz_dane(option, index=None):
+    url = ''
+    match option:
+        # Lista wszystkich stacji pomiarowych
+        case 1:
+            url = 'https://api.gios.gov.pl/pjp-api/rest/station/findAll'
+        # Czujniki danej stacji pomiarowej
+        case 2:
+            url = 'https://api.gios.gov.pl/pjp-api/rest/station/sensors/'
+        # Pomiary z danego czujnika
+        case 3:
+            url = 'https://api.gios.gov.pl/pjp-api/rest/data/getData/'
+        # Indeks jakości powietrza
+        case 4:
+            url = 'https://api.gios.gov.pl/pjp-api/rest/aqindex/getIndex/'
+
+    request = url + str(index) if index else url
+    try:
+        req = requests.get(request)
+    except requests.exceptions.HTTPError as http_error:
+        http_error_message = f'[{http_error}] Błąd protokołu HTTP'
+        aktualizuj_alert(http_error_message)
+    except requests.exceptions.ConnectionError as connection_error:
+        connection_error_message = f'[{connection_error}] Brak połącznia z serwisem GIOS '
+        aktualizuj_alert(connection_error_message)
+    except requests.exceptions.Timeout as timeout_error:
+        timeout_error_message = f'[{timeout_error}] Błąd odpowiedz od serwera'
+        aktualizuj_alert(timeout_error_message)
+    except Exception as exp:
+        exp_message = f'[{exp}] Nieoczekiwany błąd. Spróbuj później'
+        aktualizuj_alert(exp_message)
+    else:
+        return req.json()
 
 
 def wczytaj_wszystkie_stacje():
@@ -21,40 +58,57 @@ def wczytaj_wszystkie_lokalizacje():
 stacje_pomiarowe = {}
 wszystkie_lokalizacje = {}
 
+source_menu = pn.widgets.Select(description="Z jakiego źródła aplikacja ma pobrać dane?", name='Wybierz źródło danych',
+                                options=['Usługa REST', 'Baza danych'])
+load_data_button = pn.widgets.Button(name='Załaduj dane')
 
 def zaladuj_dane(event):
     global stacje_pomiarowe
     global wszystkie_lokalizacje
     wszystkie_lokalizacje.clear()
     stacje_pomiarowe.clear()
+
     if source_menu.value == 'Usługa REST':
         stacje_pomiarowe = wczytaj_wszystkie_stacje()
         station_menu_all.options = [*stacje_pomiarowe.keys()]
         station_menu_all.name = 'Wszystkie stacje pomiarowe z Usługi REST'
         wszystkie_lokalizacje = wczytaj_wszystkie_lokalizacje()
 
-    elif source_menu.value == 'Baza danych':
-        stacje_pomiarowe = {stacja[0]: stacja[1] for stacja in pobierz_wszystkie_stacje()}
-        station_menu_all.options = [*stacje_pomiarowe.keys()]
-        station_menu_all.name = 'Wszystkie stacje pomiarowe z bazy danych'
-        wszystkie_lokalizacje = pobierz_wszystkie_stacje_lokalizacja()
 
-    station_menu_all.disabled = False
-    city_input.disabled = False
-    lokalizacja.disabled = False
-    distance.disabled = False
-    button_input.disabled = False
-    button_distance_input.disabled = False
+    # elif source_menu.value == 'Baza danych':
 
+            # stacje_pomiarowe = {stacja[0]: stacja[1] for stacja in pobierz_wszystkie_stacje()}
+            # station_menu_all.options = [*stacje_pomiarowe.keys()]
+            # station_menu_all.name = 'Wszystkie stacje pomiarowe z bazy danych'
+            # wszystkie_lokalizacje = pobierz_wszystkie_stacje_lokalizacja()
+            #
+            # station_menu_all.disabled = False
+            # city_input.disabled = False
+            # lokalizacja.disabled = False
+            # distance.disabled = False
+            # button_input.disabled = False
+            # button_distance_input.disabled = False
+
+        station_menu_all.disabled = False
+        city_input.disabled = False
+        lokalizacja.disabled = False
+        distance.disabled = False
+        button_input.disabled = False
+        button_distance_input.disabled = False
 
 load_data_button.on_click(zaladuj_dane)
 
+lokalizacja = pn.widgets.TextInput(description='Wyszukaj stacje pomiarowe w podanym promieniu: ',
+                                   name='Najbliższe stacje pomiarowe',
+                                   placeholder='Wprowadź nazwę lokalizacji: ', disabled=True)
+distance = pn.widgets.TextInput(placeholder='Wprowadź promień wyszukiwania [w km]: ', disabled=True)
+button_distance_input = pn.widgets.Button(name='Szukaj najbliższej stacji 🔍', disabled=True)
 
 def stworz_mape_najblizsze(location, promien):
     promien = float(promien)
     centrum, wynik_lista, lokalizacje = najblizsze_stacje_pomiarowe(location, promien, wszystkie_lokalizacje)
 
-    mapa = pn.pane.plot.Folium(folium.Map(location=centrum), width=700, height=350, sizing_mode="stretch_width")
+    mapa = pn.pane.plot.Folium(folium.Map(location=centrum), min_width=700, height=350, sizing_mode="stretch_width")
     for miejsce, koordynaty in lokalizacje.items():
         folium.Marker(koordynaty, popup=f'{miejsce}').add_to(mapa.object)
     folium.Circle(centrum, radius=promien * 1000, fill=True, fill_opacity=0.3, fill_color='yellowgreen',
@@ -80,8 +134,14 @@ def aktualizuj_mape(event):
 
 
 button_distance_input.on_click(aktualizuj_mape)
-
-
+station_menu_all = pn.widgets.Select(name='Wszystkie stacje pomiarowe ze źródła: ', disabled=True)
+city_input = pn.widgets.TextInput(
+    name="Znajdź stację w konkretnej miejscowości: ",
+    placeholder="Wprowadź nazwę miejscowości: ",
+    disabled=True)
+button_input = pn.widgets.Button(name='Szukaj stacji dla konkretnej miejscowości 🔍', disabled=True)
+station_menu_city = pn.widgets.Select(name='Znalezione stacje: ', disabled=True)
+button_szukaj = pn.widgets.Button(name='Wyszukaj dane dla stacji 🔍')
 def zaladuj_stacje_miejscowosc(event):
     if city_input.value:
         station_menu_city.options = [nazwa for nazwa, id in stacje_pomiarowe.items() if
@@ -103,7 +163,8 @@ def wczytaj_dane_dla_stacji(event):
     opis = ''
 
     wybrana_stacja = [[nazwa, id] for nazwa, id in stacje_pomiarowe.items() if nazwa == station_menu_city.value][0]
-    lokalizacja_wybranej_stacji = [kordynaty for nazwa, kordynaty in wszystkie_lokalizacje.items() if nazwa == station_menu_city.value][0]
+    lokalizacja_wybranej_stacji = \
+    [kordynaty for nazwa, kordynaty in wszystkie_lokalizacje.items() if nazwa == station_menu_city.value][0]
 
     opis = f'Podstawowe informacje dla znalezionej stacji: \n' \
            f'Nazwa stacji {wybrana_stacja[0]} \n' \
@@ -117,10 +178,9 @@ def wczytaj_dane_dla_stacji(event):
 
         lista_czujnikow = pobierz_dane(2, id_zapytania)
         lista_indeksow = pobierz_dane(4, id_zapytania)
-
         for czujnik in lista_czujnikow:
             fig_title = czujnik['param']['paramCode']
-
+            print(czujnik)
             opis += f'* {czujnik['param']['paramCode']} - {czujnik['param']['paramName']}\n'
 
             df = pd.DataFrame((pobierz_dane(3, czujnik['id'])['values'])).fillna(0)
@@ -136,7 +196,6 @@ def wczytaj_dane_dla_stacji(event):
                     continue
                 else:
                     indeksy_stacji[indeksy] = slownik
-
     elif source_menu.value == 'Baza danych':
         ...
 
@@ -144,18 +203,45 @@ def wczytaj_dane_dla_stacji(event):
     parameters_select.disabled = False
 
 
-    mapa = pn.pane.plot.Folium(folium.Map(location=lokalizacja_wybranej_stacji, zoom_start=25), width=700, height=350,
-                               sizing_mode="stretch_width")
-    folium.Marker(lokalizacja_wybranej_stacji, popup=f'Nazwa stacji: {station_menu_city.value} \n'
-                                            f'Lokalizacja {lokalizacja_wybranej_stacji}',
-                  icon=folium.Icon(color='red', )).add_to(mapa.object)
-    main_layout[0] = mapa
-    main_layout[1] = pn.pane.Markdown(opis)
 
+parameters_select = pn.widgets.Select(name='Wybierz parametr do pokazania na wykresie', disabled=True)
 button_szukaj.on_click(wczytaj_dane_dla_stacji)
+
+number_min = pn.indicators.Number(name='Minimalne stężenie', font_size='14pt', title_size='14pt')
+number_max = pn.indicators.Number(name='Maksymalne stężenie', font_size='14pt', title_size='14pt')
+number_mean = pn.indicators.Number(name='Średnie stężenie', font_size='14pt', title_size='14pt')
+indeks_stacji = pn.indicators.Number(name='Ogólny indeks stacji', font_size='14pt', title_size='14pt',
+                                     format='{value:.0f}',
+                                     colors=[(33, 'green'), (66, 'gold'), (100, 'red')])
+indeks_parametru = pn.indicators.Number(name='Indeks parametru: ', font_size='14pt', title_size='14pt',
+                                        format='{value:.0f}',
+                                        colors=[(33, 'green'), (66, 'gold'), (100, 'red')])
+
+
+
+
+def stworz_wykres(df):
+    wykres_bar = df.hvplot.bar(x='Data i godzina odczytu', color="teal").opts(xrotation=60,
+                                                                              ylabel='Stężenie parametru',
+                                                                              height=600,
+                                                                              width=1200,
+                                                                              align='center'
+                                                                              )
+    trend = np.polyfit(range(len(df)), df['value'], 1)
+    trend_line = np.polyval(trend, range(len(df)))
+
+    trend_df = pd.DataFrame({
+        'Data i godzina odczytu': df['Data i godzina odczytu'],
+        'Trend': trend_line
+    })
+
+    line_plot = trend_df.hvplot.line(x='Data i godzina odczytu', y='Trend', color='red')
+
+    return wykres_bar * line_plot
 
 
 def aktualizuj_parametry(df):
+
     parametry = [wartosc for wartosc in df['value'] if wartosc != 0]
 
     number_min.value = round(min(parametry), 2)
@@ -178,42 +264,33 @@ def aktualizuj_parametry(df):
     indeks_parametru.value = id_parametru or None
 
 
-def stworz_wykres(df):
-    wykres_bar = df.hvplot.bar(x='Data i godzina odczytu', color="teal").opts(xrotation=60,
-                                                                              ylabel='Stężenie parametru',
-                                                                              height=600,
-                                                                              width=1200,
-                                                                              align='center'
-                                                                              )
-    trend = np.polyfit(range(len(df)), df['value'], 1)
-    trend_line = np.polyval(trend, range(len(df)))
 
-    trend_df = pd.DataFrame({
-        'Data i godzina odczytu': df['Data i godzina odczytu'],
-        'Trend': trend_line
-    })
 
-    line_plot = trend_df.hvplot.line(x='Data i godzina odczytu', y='Trend', color='red')
-
-    return wykres_bar * line_plot
-
-parameters_select = pn.widgets.Select(name='Wybierz parametr do pokazania na wykresie', disabled=True)
 def aktualizuj_panel(event=None):
     df = wszystkie_dataframy[parameters_select.value]
+
+
+
 
     suwak = pn.widgets.DatetimeRangeSlider(
         name='Data i czas: ',
         start=df.index.min(),
         end=df.index.max(),
         value=(df.index.min(), df.index.max()),
-        step=3600000,
-        align='center'
+        step=3600000
     )
+    lokalizacje = wszystkie_lokalizacje
+    lokalizacja_stacji = lokalizacje.get(station_menu_city.value)
+    mapa = pn.pane.plot.Folium(folium.Map(location=lokalizacja_stacji), min_width=700, height=350,
+                               sizing_mode="stretch_width")
+    folium.Marker(lokalizacja_stacji, popup=f'Nazwa stacji: {station_menu_city.value} \n'
+                                            f'Lokalizacja {lokalizacja_stacji}',
+                  icon=folium.Icon(color='red', )).add_to(mapa.object)
+    main_layout[0] = mapa
+    main_layout[1] = pn.pane.Markdown(opis)
 
-
-
-    @pn.depends(suwak.param.value, parameters_select.param.value)
-    def aktualizacja_wykresu(date_range, param_value):
+    @pn.depends(suwak.param.value)
+    def aktualizacja_wykresu(date_range):
         start_date, end_date = date_range
         filtered_df = df[(df.index >= pd.Timestamp(start_date)) & (df.index <= pd.Timestamp(end_date))]
         aktualizuj_parametry(filtered_df)
@@ -224,6 +301,14 @@ def aktualizuj_panel(event=None):
 
 
 parameters_select.param.watch(aktualizuj_panel, 'value')
+
+alert = pn.pane.Alert('Aplikacja działa poprawnie', alert_type='primary',dedent=True)
+
+
+def aktualizuj_alert(wiadomosc, typ='danger'):
+    alert.object = wiadomosc
+    alert.alert_type = typ
+
 
 main_layout = pn.Column(
     pn.Column(), pn.Row(),
@@ -237,7 +322,7 @@ template = pn.template.FastListTemplate(
     title='Jakość powietrza w Polsce',
     sidebar=[source_menu, load_data_button, lokalizacja, distance, button_distance_input, pn.layout.Divider(),
              station_menu_all, city_input, button_input,
-             station_menu_city, button_szukaj,
+             station_menu_city, button_szukaj, alert
              ],
     main=[main_layout],
     background_color='#dcf5d0',
