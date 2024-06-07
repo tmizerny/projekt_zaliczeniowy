@@ -1,93 +1,110 @@
-# import sqlite3
-# # from pobieranie_danych import pobierz_dane
-# #
-# # stacje_dict = {stacja['stationName']: stacja['id'] for stacja in pobierz_dane(1)}
-# # lokalizacje = {stacja['stationName']: [stacja['gegrLat'], stacja['gegrLon']] for stacja in pobierz_dane(1)}
-#
-#
-# sql_select_all = '''
-# SELECT nazwa, id_stacji, gegrLat, gegrLon FROM stacje'''
-# sql_select_stacje = '''
-# SELECT nazwa, id_stacji FROM stacje'''
-# sql_select_stacje_lokalizacja = '''SELECT nazwa, gegrLat, gegrLon FROM stacje'''
-#
-#
-# sql_select_parametry = '''SELECT * FROM parametry'''
-#
-#
-# def rob_tabele_stacji(cur: sqlite3.Cursor):
-#     sql_drop = 'DROP TABLE IF EXISTS stacje'
-#     cur.execute(sql_drop)
-#     sql1 = '''
-#     CREATE TABLE IF NOT EXISTS stacje (
-#                     id_stacji INTEGER PRIMARY KEY,
-#                     nazwa TEXT,
-#                     gegrLat REAL,
-#                     gegrLon REAL
-#                  )'''
-#     cur.execute(sql1)
-#
-# def rob_tabele_parametry(cur: sqlite3.Cursor):
-#     sql_drop = 'DROP TABLE IF EXISTS parametry'
-#     cur.execute(sql_drop)
-#     sql_create = f'''
-#     CREATE TABLE parametry (
-#                     id INTEGER PRIMARY KEY,
-#                     id_stacji INTEGER,
-#                     paramCode TEXT,
-#                     paramName TEXT,
-#                     FOREIGN KEY (id_stacji) REFERENCES stacje(id_stacji)
-#                  )'''
-#     cur.execute(sql_create)
-# def dodaj_stacje(cur: sqlite3.Cursor, nazwa: str, id_stacji: int, gegrLat: float, gegrLon: float):
-#     sql = """
-#         INSERT INTO stacje (nazwa, id_stacji, gegrLat, gegrLon)
-#         VALUES (?, ?, ?, ?);
-#         """
-#     cur.execute(sql, (nazwa, id_stacji, gegrLat, gegrLon))
-#
-# def dodaj_parametr(cur: sqlite3.Cursor, id_stacji: int, paramCode: str, paramName: str):
-#     sql_insert = """
-#         INSERT INTO parametry (id_stacji, paramCode, paramName)
-#         VALUES (?, ?, ?);
-#         """
-#     cur.execute(sql_insert, (id_stacji, paramCode, paramName))
-#
-# # with sqlite3.connect('baza_danych.db') as conn:
-# #     cur = conn.cursor()
-# #     rob_tabele_stacji(cur)
-# #     rob_tabele_parametry(cur)
-# #     for nazwa, id_stacji in stacje_dict.items():
-# #         szerokosc, dlugosc = lokalizacje[nazwa]
-# #         dodaj_stacje(cur, nazwa, id_stacji, szerokosc, dlugosc)
-# #         lista_czujnikow = pobierz_dane(2, id_stacji)
-# #
-# #         for parametr in lista_czujnikow:
-# #             paramCode = parametr['param']['paramCode']
-# #             paramName = parametr['param']['paramName']
-# #             dodaj_parametr(cur, id_stacji, paramCode, paramName)
-#
-#     conn.commit()
-#
-# def pobierz_wszystkie_stacje():
-#     with sqlite3.connect('baza_danych.db') as conn:
-#         cur = conn.cursor()
-#         cur.execute(sql_select_stacje)
-#         return cur.fetchall()
-#
-# def pobierz_wszystkie_stacje_lokalizacja():
-#     with sqlite3.connect('baza_danych.db') as conn:
-#         cur = conn.cursor()
-#         cur.execute(sql_select_stacje_lokalizacja)
-#         stacje_lok = cur.fetchall()
-#         return {stacja[0]:[stacja[1],stacja[2]] for stacja in stacje_lok}
-#
-#
-# # def pobierz_wszystkie_parametry():
-# #     with sqlite3.connect('baza_danych.db') as conn:
-# #         cur = conn.cursor()
-# #         cur.execute("SELECT * FROM parametry")
-# #         return cur.fetchall()
-#
-#
-# # print(pobierz_wszystkie_parametry())
+import pandas as pd
+import sqlalchemy
+from app import pobierz_dane
+
+from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+
+stacje_dict = {stacja['stationName']: stacja['id'] for stacja in pobierz_dane(1) if stacja['id'] == 944}
+lokalizacje = {stacja['stationName']: [stacja['gegrLat'], stacja['gegrLon']] for stacja in pobierz_dane(1) if stacja['id'] == 944}
+
+
+
+
+Baza = declarative_base()
+
+
+class Stacja(Baza):
+    __tablename__ = 'stacje'
+
+    id_stacji = Column(Integer, primary_key=True, unique=True)
+    nazwa = Column(String, nullable=False)
+    gegrLat = Column(Float, nullable=False)
+    gegrLon = Column(Float, nullable=False)
+    parametry = relationship('Parametr', back_populates='stacja')
+    indeksy = relationship('Indeks', back_populates='stacja')
+
+class Indeks(Baza):
+    __tablename__ = 'indeksy'
+
+    id = Column(Integer, primary_key=True)
+    id_stacji = Column(Integer, ForeignKey('stacje.id_stacji'), nullable=False)
+    nazwa_indeksu = Column(String, nullable=False)
+    value_indeksu = Column(Integer, nullable=False)
+    stacja = relationship('Stacja', back_populates='indeksy')
+
+class Parametr(Baza):
+    __tablename__ = 'parametry'
+
+    id = Column(Integer, primary_key=True)
+    paramCode = Column(String, nullable=False)
+    paramName = Column(String, nullable=False)
+    id_stacji = Column(Integer, ForeignKey('stacje.id_stacji'), nullable=False)
+    stacja = relationship('Stacja', back_populates='parametry')
+    pomiary = relationship('Pomiar', back_populates='parametr')
+
+class Pomiar(Baza):
+    __tablename__ = 'pomiary'
+
+    id = Column(Integer, primary_key=True)
+    parametr_id = Column(Integer, ForeignKey('parametry.id'), nullable=False)
+    date = Column(String, nullable=False)
+    value = Column(Float)
+    parametr = relationship('Parametr', back_populates='pomiary')
+
+
+engine = create_engine('sqlite:///baza_danych.db')
+Baza.metadata.drop_all(engine)
+Baza.metadata.create_all(engine)
+Session = sessionmaker(bind=engine)
+session = Session()
+
+
+def dodaj_do_bazy_danych(stacje, lokalizacje):
+    for nazwa, id in stacje.items():
+        gegrLat, gegrLon = lokalizacje[nazwa]
+        stacja = Stacja(id_stacji=id, nazwa=nazwa, gegrLat=gegrLat, gegrLon=gegrLon)
+        session.add(stacja)
+        lista_czujnikow = pobierz_dane(2,id)
+        lista_indeksow = pobierz_dane(4, id)
+        for czujnik in lista_czujnikow:
+            parametr = Parametr(id=czujnik['id'], paramCode=czujnik['param']['paramCode'], paramName=czujnik['param']['paramName'], id_stacji=id)
+            pomiary = pobierz_dane(3, czujnik['id'])['values']
+            for slownik in pomiary:
+                pomiar = Pomiar(parametr_id=czujnik['id'], date=slownik['date'], value=slownik['value'])
+                session.add(pomiar)
+            session.add(parametr)
+        for indeks, slownik in lista_indeksow.items():
+            if 'IndexLevel' in indeks:
+                if slownik is None:
+                    continue
+                else:
+                    indeks = Indeks(id_stacji=id, nazwa_indeksu=indeks, value_indeksu=slownik['id'])
+                    session.add(indeks)
+    session.commit()
+
+dodaj_do_bazy_danych(stacje_dict,lokalizacje)
+
+def wczytaj_stacje_bd():
+    return {stacja.nazwa: stacja.id_stacji for stacja in session.query(Stacja).all()}
+
+def wczytaj_lokalizacje_bd():
+    return {stacja.nazwa: [stacja.gegrLat, stacja.gegrLon] for stacja in session.query(Stacja).all()}
+
+
+def wczytaj_parametry_bd():
+    return [{parametr.paramCode  : parametr.paramName} for parametr in session.query(Parametr).all()]
+
+def wczytaj_parametry_z_pomiarami_df():
+    parametry_dict = {}
+    for parametr in session.query(Parametr).all():
+        pomiary = session.query(Pomiar).filter_by(parametr_id=parametr.id).all()
+        data = {pomiar.date: pomiar.value for pomiar in pomiary}
+        df = pd.DataFrame(list(data.items()), columns=['date', 'value']).set_index('date')
+        parametry_dict[parametr.paramCode] = df
+    return parametry_dict
+
+
+print(wczytaj_parametry_z_pomiarami_df())
+
+session.close()

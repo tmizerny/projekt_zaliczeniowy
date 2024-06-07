@@ -1,6 +1,5 @@
-
 from najblizsze_stacje import najblizsze_stacje_pomiarowe
-
+# from baza_danych import wczytaj_stacje_bd, wczytaj_lokalizacje_bd
 
 import panel as pn
 import pandas as pd
@@ -62,6 +61,7 @@ source_menu = pn.widgets.Select(description="Z jakiego źródła aplikacja ma po
                                 options=['Usługa REST', 'Baza danych'])
 load_data_button = pn.widgets.Button(name='Załaduj dane')
 
+
 def zaladuj_dane(event):
     global stacje_pomiarowe
     global wszystkie_lokalizacje
@@ -77,24 +77,18 @@ def zaladuj_dane(event):
 
     # elif source_menu.value == 'Baza danych':
 
-            # stacje_pomiarowe = {stacja[0]: stacja[1] for stacja in pobierz_wszystkie_stacje()}
-            # station_menu_all.options = [*stacje_pomiarowe.keys()]
-            # station_menu_all.name = 'Wszystkie stacje pomiarowe z bazy danych'
-            # wszystkie_lokalizacje = pobierz_wszystkie_stacje_lokalizacja()
-            #
-            # station_menu_all.disabled = False
-            # city_input.disabled = False
-            # lokalizacja.disabled = False
-            # distance.disabled = False
-            # button_input.disabled = False
-            # button_distance_input.disabled = False
+        # stacje_pomiarowe = wczytaj_stacje_bd()
+        # station_menu_all.options = [*stacje_pomiarowe.keys()]
+        # station_menu_all.name = 'Wszystkie stacje pomiarowe z bazy danych'
+        # wszystkie_lokalizacje = wczytaj_lokalizacje_bd()
 
-        station_menu_all.disabled = False
-        city_input.disabled = False
-        lokalizacja.disabled = False
-        distance.disabled = False
-        button_input.disabled = False
-        button_distance_input.disabled = False
+    station_menu_all.disabled = False
+    city_input.disabled = False
+    lokalizacja.disabled = False
+    distance.disabled = False
+    button_input.disabled = False
+    button_distance_input.disabled = False
+
 
 load_data_button.on_click(zaladuj_dane)
 
@@ -103,6 +97,7 @@ lokalizacja = pn.widgets.TextInput(description='Wyszukaj stacje pomiarowe w poda
                                    placeholder='Wprowadź nazwę lokalizacji: ', disabled=True)
 distance = pn.widgets.TextInput(placeholder='Wprowadź promień wyszukiwania [w km]: ', disabled=True)
 button_distance_input = pn.widgets.Button(name='Szukaj najbliższej stacji 🔍', disabled=True)
+
 
 def stworz_mape_najblizsze(location, promien):
     promien = float(promien)
@@ -142,6 +137,8 @@ city_input = pn.widgets.TextInput(
 button_input = pn.widgets.Button(name='Szukaj stacji dla konkretnej miejscowości 🔍', disabled=True)
 station_menu_city = pn.widgets.Select(name='Znalezione stacje: ', disabled=True)
 button_szukaj = pn.widgets.Button(name='Wyszukaj dane dla stacji 🔍')
+
+
 def zaladuj_stacje_miejscowosc(event):
     if city_input.value:
         station_menu_city.options = [nazwa for nazwa, id in stacje_pomiarowe.items() if
@@ -164,7 +161,7 @@ def wczytaj_dane_dla_stacji(event):
 
     wybrana_stacja = [[nazwa, id] for nazwa, id in stacje_pomiarowe.items() if nazwa == station_menu_city.value][0]
     lokalizacja_wybranej_stacji = \
-    [kordynaty for nazwa, kordynaty in wszystkie_lokalizacje.items() if nazwa == station_menu_city.value][0]
+        [kordynaty for nazwa, kordynaty in wszystkie_lokalizacje.items() if nazwa == station_menu_city.value][0]
 
     opis = f'Podstawowe informacje dla znalezionej stacji: \n' \
            f'Nazwa stacji {wybrana_stacja[0]} \n' \
@@ -190,18 +187,18 @@ def wczytaj_dane_dla_stacji(event):
             df = df[::-1]
             wszystkie_dataframy[fig_title] = df
 
-        for indeksy, slownik in lista_indeksow.items():
-            if 'IndexLevel' in indeksy:
+        for parametr, slownik in lista_indeksow.items():
+            if 'IndexLevel' in parametr:
                 if slownik is None:
                     continue
                 else:
-                    indeksy_stacji[indeksy] = slownik
+                    indeksy_stacji[parametr] = slownik
+
     elif source_menu.value == 'Baza danych':
         ...
 
     parameters_select.options = [*wszystkie_dataframy.keys()]
     parameters_select.disabled = False
-
 
 
 parameters_select = pn.widgets.Select(name='Wybierz parametr do pokazania na wykresie', disabled=True)
@@ -216,8 +213,6 @@ indeks_stacji = pn.indicators.Number(name='Ogólny indeks stacji', font_size='14
 indeks_parametru = pn.indicators.Number(name='Indeks parametru: ', font_size='14pt', title_size='14pt',
                                         format='{value:.0f}',
                                         colors=[(33, 'green'), (66, 'gold'), (100, 'red')])
-
-
 
 
 def stworz_wykres(df):
@@ -241,7 +236,6 @@ def stworz_wykres(df):
 
 
 def aktualizuj_parametry(df):
-
     parametry = [wartosc for wartosc in df['value'] if wartosc != 0]
 
     number_min.value = round(min(parametry), 2)
@@ -264,13 +258,8 @@ def aktualizuj_parametry(df):
     indeks_parametru.value = id_parametru or None
 
 
-
-
 def aktualizuj_panel(event=None):
     df = wszystkie_dataframy[parameters_select.value]
-
-
-
 
     suwak = pn.widgets.DatetimeRangeSlider(
         name='Data i czas: ',
@@ -302,7 +291,7 @@ def aktualizuj_panel(event=None):
 
 parameters_select.param.watch(aktualizuj_panel, 'value')
 
-alert = pn.pane.Alert('Aplikacja działa poprawnie', alert_type='primary',dedent=True)
+alert = pn.pane.Alert('Aplikacja działa poprawnie', alert_type='primary', dedent=True)
 
 
 def aktualizuj_alert(wiadomosc, typ='danger'):
