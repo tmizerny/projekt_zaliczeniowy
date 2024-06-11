@@ -3,8 +3,11 @@ Główny moduł aplikacji
 """
 
 from najblizsze_stacje import najblizsze_stacje_pomiarowe
-# from baza_danych import wczytaj_stacje_bd, wczytaj_lokalizacje_bd
+from baza_danych import (wczytaj_stacje_bd, wczytaj_lokalizacje_bd, wczytaj_parametry_bd,
+                         wczytaj_parametry_z_pomiarami_bd, wczytaj_indeksy_stacji_parametrow_bd, dodaj_do_bazy_danych)
 
+
+import os.path
 import panel as pn
 import pandas as pd
 import requests
@@ -13,7 +16,6 @@ import numpy as np
 import hvplot.pandas
 
 pn.extension()
-
 
 def pobierz_dane(option, index=None):
     """
@@ -56,8 +58,6 @@ def pobierz_dane(option, index=None):
         aktualizuj_alert(exp_message)
     else:
         return req.json()
-
-
 def wczytaj_wszystkie_stacje():
     """
     Funkcja buduje słownik {nazwa stacji: id stacji} z odpowiedzi z funkcji pobierz_dane
@@ -76,7 +76,7 @@ def wczytaj_wszystkie_lokalizacje():
 
 
 # Tworzenie słowników na stacje pomiarowe
-stacje_pomiarowe = {}
+wszystkie_stacje_pomiarowe = {}
 wszystkie_lokalizacje = {}
 
 # Inicjalizacja widgetów obsługujących wczytanie źródła danych
@@ -86,6 +86,18 @@ zrodlo_danych_select = pn.widgets.Select(description="Z jakiego źródła aplika
                                          options=['Usługa REST', 'Baza danych'])
 # Guzik zatwierdzający źródło danych
 zrodlo_danych_button = pn.widgets.Button(name='Załaduj dane')
+
+def przelacz_widgety(opcja):
+    """
+    Funkcja pomocnicza dla załaduj_dane. Włącza lub wyłącza dostępność widgetów w zależności od potrzeby
+    :param opcja: True-widgety wyłączone False-widgety włączone
+    """
+    stacje_select_all.disabled = opcja
+    miasto_input.disabled = opcja
+    lokalizacja_input.disabled = opcja
+    dystans_input.disabled = opcja
+    miasto_input_button.disabled = opcja
+    promien_szukaj_button.disabled = opcja
 
 
 def zaladuj_dane(event):
@@ -97,31 +109,33 @@ def zaladuj_dane(event):
     :param event: argument obsługujący wciśnięcie guzika zrodlo_danych_button (event)
     """
     # Wyczyszczenie ewentualnej zawartości słowników z poprzedniego użytkowania aplikacji
-    global stacje_pomiarowe
+    global wszystkie_stacje_pomiarowe
     global wszystkie_lokalizacje
     wszystkie_lokalizacje.clear()
-    stacje_pomiarowe.clear()
+    wszystkie_stacje_pomiarowe.clear()
 
     if zrodlo_danych_select.value == 'Usługa REST':
-        stacje_pomiarowe = wczytaj_wszystkie_stacje()
-        stacje_select_all.options = [*stacje_pomiarowe.keys()]
+        wszystkie_stacje_pomiarowe = wczytaj_wszystkie_stacje()
+        stacje_select_all.options = [*wszystkie_stacje_pomiarowe.keys()]
         stacje_select_all.name = 'Wszystkie stacje pomiarowe z Usługi REST'
         wszystkie_lokalizacje = wczytaj_wszystkie_lokalizacje()
+        # włączenie widgetów
+        przelacz_widgety(False)
+        aktualizuj_alert('Pobrano dane z usługi REST', typ='success')
 
-    # elif source_menu.value == 'Baza danych':
+    elif zrodlo_danych_select.value == 'Baza danych':
+        wszystkie_stacje_pomiarowe = wczytaj_stacje_bd()
+        if not wszystkie_stacje_pomiarowe:
+            aktualizuj_alert('Baza danych jest pusta. Skorzystaj z usługi REST', typ='warning')
+            przelacz_widgety(True)
+        else:
+            stacje_select_all.options = [*wszystkie_stacje_pomiarowe.keys()]
+            stacje_select_all.name = 'Wszystkie stacje pomiarowe z bazy danych'
+            wszystkie_lokalizacje = wczytaj_lokalizacje_bd()
+            # włączenie widgetów
+            aktualizuj_alert('Pobrano dane hz bazy danych', typ='success')
+            przelacz_widgety(False)
 
-    # stacje_pomiarowe = wczytaj_stacje_bd()
-    # station_menu_all.options = [*stacje_pomiarowe.keys()]
-    # station_menu_all.name = 'Wszystkie stacje pomiarowe z bazy danych'
-    # wszystkie_lokalizacje = wczytaj_lokalizacje_bd()
-
-    # włączenie wszystkich wyłączonych widgetów
-    stacje_select_all.disabled = False
-    miasto_input.disabled = False
-    lokalizacja_input.disabled = False
-    dystans_input.disabled = False
-    miasto_input_button.disabled = False
-    promien_szukaj_button.disabled = False
 
 
 # Metoda obsługująca kliknięcie w guzik zrodlo_danych_button
@@ -219,7 +233,7 @@ def zaladuj_stacje_miejscowosc(event):
     :return:
     """
     if miasto_input.value:
-        stacje_w_miescie_select.options = [nazwa for nazwa, id in stacje_pomiarowe.items() if
+        stacje_w_miescie_select.options = [nazwa for nazwa, id in wszystkie_stacje_pomiarowe.items() if
                                            miasto_input.value in nazwa.split(',')[0]]
         stacje_w_miescie_select.disabled = False
 
@@ -254,15 +268,17 @@ def wczytaj_dane_dla_stacji(event):
     Funkcja obsługująca wczytanie danych dla wybranej stacji w zależności od wybranego źródła danych
     :param event: argument obsługujący wciśnięcie guzika wyszukaj_dane_button (event)
     """
-    # Wyczyszczenie obiektów z poprzedniej zawarości
+    # Wyczyszczenie obiektów z poprzedniej zawartości
     global opis
+    global wszystkie_dataframy
+    global indeksy_stacji
     wszystkie_dataframy.clear()
     indeksy_stacji.clear()
     opis = ''
 
     # Wyszukanie nazwy stacji, id, długości i szerokości geograficznej w słownikach dla wybranej
     # przez użytkownika stacji
-    wybrana_stacja = [[nazwa, id] for nazwa, id in stacje_pomiarowe.items()
+    wybrana_stacja = [[nazwa, id] for nazwa, id in wszystkie_stacje_pomiarowe.items()
                       if nazwa == stacje_w_miescie_select.value][0]
     lokalizacja_wybranej_stacji = [kordynaty for nazwa, kordynaty in wszystkie_lokalizacje.items()
                                    if nazwa == stacje_w_miescie_select.value][0]
@@ -275,7 +291,7 @@ def wczytaj_dane_dla_stacji(event):
            f'Lista czujników dostępnych dla stacji: \n'
 
     # Wyszukanie id dla wybranej stacji
-    stacje = stacje_pomiarowe
+    stacje = wszystkie_stacje_pomiarowe
     id_zapytania = stacje.get(stacje_w_miescie_select.value)
 
     if zrodlo_danych_select.value == 'Usługa REST':
@@ -303,14 +319,30 @@ def wczytaj_dane_dla_stacji(event):
                 if slownik is None:
                     continue
                 else:
-                    indeksy_stacji[parametr] = slownik
+                    indeksy_stacji[parametr] = slownik['id']
 
     elif zrodlo_danych_select.value == 'Baza danych':
-        ...
+
+        # aktualizacja opisu w postaci-> wzór chemiczny/kod parametru-słowna nazwa parametru dla kolejnych czujników
+        parametry = wczytaj_parametry_bd(id_zapytania)
+        for slownik in parametry:
+            for wzor, nazwa_parametru in slownik.items():
+                opis += f'* {wzor} - {nazwa_parametru}\n'
+
+        # Pobranie słownika ramek danych z bazy danych
+        df_baza = wczytaj_parametry_z_pomiarami_bd(id_zapytania)
+
+        # Formatowanie i przypisanie danych do zmiennej wszystkie_dataframy
+        wszystkie_dataframy = {key : sformatuj_dataframe(value) for key, value in df_baza.items()}
+
+        # Pobranie indeksów stacji z bazy danych
+        indeksy_stacji = wczytaj_indeksy_stacji_parametrow_bd(id_zapytania)
+
 
     # Aktualizacja parametrów do wyświetlenia dla wybranej stacji oraz odblokowanie menu wyboru
     wybor_parametru_select.options = [*wszystkie_dataframy.keys()]
     wybor_parametru_select.disabled = False
+
 
 # Metoda wczytuje dane dla stacji po kliknięciu guzika wyszukaj_dane_button
 wyszukaj_dane_button.on_click(wczytaj_dane_dla_stacji)
@@ -363,83 +395,145 @@ def stworz_wykres(df):
 
 
 def aktualizuj_parametry(df):
+    """
+    Funkcja aktualuje wartości widgetów Number z wartościami charakterystycznymi na podstawie ramki danych
+    :param df: ramka danych
+    """
+
+    # Wykluczenie wartości zerowych z danych
     parametry = [wartosc for wartosc in df['value'] if wartosc != 0]
 
+    # Aktualizacja wartości widgetów o wartości charakterystyczne
     minimum_number.value = round(min(parametry), 2)
     maximum_number.value = round(max(parametry), 2)
     srednia_number.value = round(sum(parametry) / len(parametry), 2)
 
+    # Zmiana wartości widgetu odpowiadającego za ogólny indeks stacji
     id_parametr_ogolny = indeksy_stacji["stIndexLevel"] or None
 
-    if id_parametr_ogolny['id'] == 0:
-        indeks_stacji_number.value = id_parametr_ogolny['id'] + 0.1
-    elif id_parametr_ogolny['id'] == -1:
+    # W przypadku wartości indeksu 0 zmiana jego wartości (widget potraktowałby 0 jako None)
+    if id_parametr_ogolny == 0:
+        indeks_stacji_number.value = id_parametr_ogolny + 0.1
+    elif id_parametr_ogolny == -1:
         indeks_stacji_number.value = None
     else:
-        indeks_stacji_number.value = id_parametr_ogolny['id']
+        indeks_stacji_number.value = id_parametr_ogolny
 
+    # # Zmiana wartości widgetu odpowiadająca za indeks danego parametru
     id_parametr_liczony_klucz = str(wybor_parametru_select.value.lower().replace(".", "")) + 'IndexLevel'
-    id_parametru = indeksy_stacji.get(id_parametr_liczony_klucz, {}).get('id', None)
+    id_parametru = indeksy_stacji.get(id_parametr_liczony_klucz, None)
     id_parametru = id_parametru + 0.1 if id_parametru == 0 else id_parametru
+
+    # Aktualizacja widgetu
     indeks_parametru_number.name = f'Indeks parametru: {wybor_parametru_select.value}'
     indeks_parametru_number.value = id_parametru or None
 
 
-def aktualizuj_panel(event=None):
-    df = wszystkie_dataframy[wybor_parametru_select.value]
-
-    suwak = pn.widgets.DatetimeRangeSlider(
+def utworz_slider(df):
+    """
+    Funkcja pomocnicza funkcji aktualizuj panel tworzy widget slider wyboru daty i czasu pomaru na podstawie ramki danych
+    :param df: ramka danych
+    :return: widget DatetimeRangeSlider
+    """
+    return pn.widgets.DatetimeRangeSlider(
         name='Data i czas: ',
         start=df.index.min(),
         end=df.index.max(),
         value=(df.index.min(), df.index.max()),
         step=3600000
     )
-    lokalizacje = wszystkie_lokalizacje
+
+
+def aktualizuj_mape_panel(lokalizacje):
+    """
+    Funkcja pomocnicza funkcji aktualizuj_panel
+    tworzy obiekt mapy na podstawie wybranej przez użytkownika stacji pomiarowej
+    :param lokalizacje: słownik wszystkich dostępnych lokalizacji
+    :return: obiekt mapy
+    """
     lokalizacja_stacji = lokalizacje.get(stacje_w_miescie_select.value)
     mapa = pn.pane.plot.Folium(folium.Map(location=lokalizacja_stacji), min_width=700, height=350,
                                sizing_mode="stretch_width")
     folium.Marker(lokalizacja_stacji, popup=f'Nazwa stacji: {stacje_w_miescie_select.value} \n'
                                             f'Lokalizacja {lokalizacja_stacji}',
                   icon=folium.Icon(color='red', )).add_to(mapa.object)
-    main_layout[0] = mapa
+    return mapa
+
+
+def aktualizuj_panel(event=None):
+    """
+    Funkcja aktualizująca główną zawartość panelu
+    :param event: argument obsługujący zmianę wartości parametru menu select wybor_parametru_select (event)
+    """
+    # Wczytanie opowiedniej ramki danych
+    df = wszystkie_dataframy[wybor_parametru_select.value]
+
+    # Tworzenie suwaka wyboru daty i czasu dla ramki danych oraz utworzenie mapy dla wybranej lokalizacji
+    suwak = utworz_slider(df)
+    lokalizacje = wszystkie_lokalizacje
+
+    # Aktualizacja panelu
+    main_layout[0] = aktualizuj_mape_panel(lokalizacje)
     main_layout[1] = pn.pane.Markdown(opis)
 
     @pn.depends(suwak.param.value)
-    def aktualizacja_wykresu(date_range):
-        start_date, end_date = date_range
-        filtered_df = df[(df.index >= pd.Timestamp(start_date)) & (df.index <= pd.Timestamp(end_date))]
+    def aktualizacja_wykresu(zakres_dat):
+        """
+        Funkcja pomocnicza funkcji aktualizuj panel. Funkcja wykorzystuje dekorator depends aby dynamicznie akutalzować
+        wykres w zależności od wybranego zakresu dat. Dadatkowo funkcja wywołuje zmianę wartości widgetów Number
+        :param zakres_dat: przedział dat i czasu z suwaka
+        :return: wykres na podstawie zaktualizowanego zakresu dat i czasu
+        """
+        data_start, data_end = zakres_dat
+        filtered_df = df[(df.index >= pd.Timestamp(data_start)) & (df.index <= pd.Timestamp(data_end))]
         aktualizuj_parametry(filtered_df)
         return stworz_wykres(filtered_df)
 
+    # Aktualizacja panelu
     main_layout[3] = pn.panel(aktualizacja_wykresu)
     main_layout[4] = suwak
 
 
+# Metoda siedząca zmianę wartości parametry w menu select i wywołująca funkcję przy jej zmianie
 wybor_parametru_select.param.watch(aktualizuj_panel, 'value')
-
+# Widget obsługujący ostrzerzenia
 alert = pn.pane.Alert('Aplikacja działa poprawnie', alert_type='primary', dedent=True)
 
 
 def aktualizuj_alert(wiadomosc, typ='danger'):
+    """
+    Funkcja aktualizuje widget odpowiedzialny za ostrzeżenia o nową treść i typ alertu
+    :param wiadomosc: wiadomość wyświetlana w alercie
+    :param typ: typ alertu
+    """
     alert.object = wiadomosc
     alert.alert_type = typ
+def zapisz_dane_bd(event=None):
+    dodaj_do_bazy_danych(wszystkie_stacje_pomiarowe, wszystkie_lokalizacje, pobierz_dane)
+    aktualizuj_alert('Wczytano dane do bazy','primary')
+    baza_danych_button.disabled = True
+
+baza_danych_button = pn.widgets.Button(name='Zapisz dane do bazy danych')
+baza_danych_button.on_click(zapisz_dane_bd)
 
 
+# Głowny layout panelu. Puste rzędy zostają zaktualizowane w toku działania aplikacji
 main_layout = pn.Column(
     pn.Column(), pn.Row(),
     pn.Card(pn.Column(pn.Row(wybor_parametru_select),
-                      pn.Row(maximum_number, srednia_number, minimum_number, indeks_stacji_number, indeks_parametru_number),
+                      pn.Row(maximum_number, srednia_number, minimum_number, indeks_stacji_number,
+                             indeks_parametru_number),
                       ),
             title='Dane panelu', sizing_mode="stretch_width"),
     pn.Row(), pn.Row())
 
+# Głowna templatka aplikacji
 template = pn.template.FastListTemplate(
     title='Jakość powietrza w Polsce',
     sidebar=[zrodlo_danych_select, zrodlo_danych_button, lokalizacja_input, dystans_input, promien_szukaj_button,
              pn.layout.Divider(),
              stacje_select_all, miasto_input, miasto_input_button,
-             stacje_w_miescie_select, wyszukaj_dane_button, alert
+             stacje_w_miescie_select, wyszukaj_dane_button, alert,baza_danych_button
              ],
     main=[main_layout],
     background_color='#dcf5d0',
