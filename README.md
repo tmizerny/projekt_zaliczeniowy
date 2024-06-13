@@ -13,7 +13,8 @@ panel serve app.py --autoreload
 
 ### Funkcjonalności
 
-- Pobieranie Danych: Aplikacja pobiera dane z usługi REST prowadzonej przez GIOS. W przypadku braku połączenia, obsługiwane są wyjątki.
+- Pobieranie Danych: Aplikacja pobiera dane z usługi REST prowadzonej przez GIOS - https://powietrze.gios.gov.pl/pjp/content/api
+- Obsługa Wyjątków: W przypadku braku połączenia lub pustej bazy danych
 - Wybór Źródła Danych: Użytkownik wybiera źródło danych (Usługa REST lub Baza danych)
 - Lista Stacji: Użytkownik otrzymuje pełną listę nazw stacji w Polsce.
 - Najbliższe Stacje: Użytkownik może sprawdzić listę najbliższych stacji pomiarowych w podanym promieniu. Aplikacja wyświetla mapę z naniesionymi stacjami oraz listę najbliższych stacji pomiarowych.
