@@ -2,12 +2,10 @@
 Główny moduł aplikacji
 """
 
-from najblizsze_stacje import najblizsze_stacje_pomiarowe
+from funkcje_pomocnicze import najblizsze_stacje_pomiarowe, stworz_wykres, sformatuj_dataframe
 from baza_danych import (wczytaj_stacje_bd, wczytaj_lokalizacje_bd, wczytaj_parametry_bd,
                          wczytaj_parametry_z_pomiarami_bd, wczytaj_indeksy_stacji_parametrow_bd, dodaj_do_bazy_danych)
 
-
-import os.path
 import panel as pn
 import pandas as pd
 import requests
@@ -17,10 +15,11 @@ import hvplot.pandas
 
 pn.extension()
 
+
 def pobierz_dane(option, index=None):
     """
     Funkcja wysyłająca zapytanie do usługi REST
-    :param option: wybór url'a do którego ma zostać wysłane zapytanie
+    :param option: wybór url'a, do którego ma zostać wysłane zapytanie
     :param index: dodatkowy argument do zapytania (indeks stacji, czujnika, indeksu jakiści powietrza)
     :return: odpowiedź od usługi REST w postaci pliku JSON
     """
@@ -58,6 +57,8 @@ def pobierz_dane(option, index=None):
         aktualizuj_alert(exp_message)
     else:
         return req.json()
+
+
 def wczytaj_wszystkie_stacje():
     """
     Funkcja buduje słownik {nazwa stacji: id stacji} z odpowiedzi z funkcji pobierz_dane
@@ -86,6 +87,7 @@ zrodlo_danych_select = pn.widgets.Select(description="Z jakiego źródła aplika
                                          options=['Usługa REST', 'Baza danych'])
 # Guzik zatwierdzający źródło danych
 zrodlo_danych_button = pn.widgets.Button(name='Załaduj dane')
+
 
 def przelacz_widgety(opcja):
     """
@@ -135,7 +137,6 @@ def zaladuj_dane(event):
             # włączenie widgetów
             aktualizuj_alert('Pobrano dane hz bazy danych', typ='success')
             przelacz_widgety(False)
-
 
 
 # Metoda obsługująca kliknięcie w guzik zrodlo_danych_button
@@ -247,22 +248,6 @@ indeksy_stacji = {}
 opis = ''
 
 
-def sformatuj_dataframe(df):
-    """
-    Funkcja pomocnicza dla funkcji wczytaj_dane_dla_stacji formatująca dane do wykresu
-    :param df: ramka danych
-    :return: sformatowana ramka danych
-    """
-    # Zamiana danych na typ datetime
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.set_index('date')
-    # Dostosowanie dat i godzin do formatu 00:00 dd/mm/yyyy
-    df['Data i godzina odczytu'] = df.index.strftime('%H:%M %d/%m/%Y')
-    # Odwrócenie kolejności (daty najwcześniejsze będą po lewej stronie wykresu)
-    df = df[::-1]
-    return df
-
-
 def wczytaj_dane_dla_stacji(event):
     """
     Funkcja obsługująca wczytanie danych dla wybranej stacji w zależności od wybranego źródła danych
@@ -333,11 +318,10 @@ def wczytaj_dane_dla_stacji(event):
         df_baza = wczytaj_parametry_z_pomiarami_bd(id_zapytania)
 
         # Formatowanie i przypisanie danych do zmiennej wszystkie_dataframy
-        wszystkie_dataframy = {key : sformatuj_dataframe(value) for key, value in df_baza.items()}
+        wszystkie_dataframy = {key: sformatuj_dataframe(value) for key, value in df_baza.items()}
 
         # Pobranie indeksów stacji z bazy danych
         indeksy_stacji = wczytaj_indeksy_stacji_parametrow_bd(id_zapytania)
-
 
     # Aktualizacja parametrów do wyświetlenia dla wybranej stacji oraz odblokowanie menu wyboru
     wybor_parametru_select.options = [*wszystkie_dataframy.keys()]
@@ -365,38 +349,9 @@ indeks_parametru_number = pn.indicators.Number(name='Indeks parametru: ', font_s
                                                colors=[(33, 'green'), (66, 'gold'), (100, 'red')])
 
 
-def stworz_wykres(df):
-    """
-    Funkcja tworzy wykres słupkowy oraz liniowy na podstawie ramki danych
-    :param df: ramka danych
-    :return: kombinowany wykres słupkowy i liniowy
-    """
-    # Wykres słupkowy
-    wykres_bar = df.hvplot.bar(x='Data i godzina odczytu', color="teal").opts(xrotation=60,
-                                                                              ylabel='Stężenie parametru',
-                                                                              height=600,
-                                                                              width=1200,
-                                                                              align='center'
-                                                                              )
-    # Wyliczanie linii trendu metodą najmniejszych kwadratów
-    trend = np.polyfit(range(len(df)), df['value'], 1)
-    trend_line = np.polyval(trend, range(len(df)))
-
-    trend_df = pd.DataFrame({
-        'Data i godzina odczytu': df['Data i godzina odczytu'],
-        'Trend': trend_line
-    })
-
-    # Tworzenie linii trendu dla uzyskanych wartości
-    line_plot = trend_df.hvplot.line(x='Data i godzina odczytu', y='Trend', color='red')
-
-    # Zwracanie kombinowanego wykresu
-    return wykres_bar * line_plot
-
-
 def aktualizuj_parametry(df):
     """
-    Funkcja aktualuje wartości widgetów Number z wartościami charakterystycznymi na podstawie ramki danych
+    Funkcja aktualizuje wartości widgetów Number z wartościami charakterystycznymi na podstawie ramki danych
     :param df: ramka danych
     """
 
@@ -508,14 +463,24 @@ def aktualizuj_alert(wiadomosc, typ='danger'):
     """
     alert.object = wiadomosc
     alert.alert_type = typ
+
+
 def zapisz_dane_bd(event=None):
+    """
+    Funkcja obsługująca zapis danych z usługi REST do bazy danych. Dodatkowo zmienia wiadomość i typ alertu
+    :param event: argument obsługujący kliknięcie w guzik baza_danych_button (event)
+    :return:
+    """
+    aktualizuj_alert('Zapisuje dane do bazy danych', typ='warning')
     dodaj_do_bazy_danych(wszystkie_stacje_pomiarowe, wszystkie_lokalizacje, pobierz_dane)
-    aktualizuj_alert('Wczytano dane do bazy','primary')
+    aktualizuj_alert('Wczytano dane do bazy', 'primary')
     baza_danych_button.disabled = True
 
-baza_danych_button = pn.widgets.Button(name='Zapisz dane do bazy danych')
-baza_danych_button.on_click(zapisz_dane_bd)
 
+# Guzik obsługujący zapis danych do bazy danych
+baza_danych_button = pn.widgets.Button(name='Zapisz dane do bazy danych')
+# Metoda wywołująca funkcję odpowiedzialną za zapis do bazy danych po kliknięciu widgetu baza_danych_button
+baza_danych_button.on_click(zapisz_dane_bd)
 
 # Głowny layout panelu. Puste rzędy zostają zaktualizowane w toku działania aplikacji
 main_layout = pn.Column(
@@ -533,7 +498,7 @@ template = pn.template.FastListTemplate(
     sidebar=[zrodlo_danych_select, zrodlo_danych_button, lokalizacja_input, dystans_input, promien_szukaj_button,
              pn.layout.Divider(),
              stacje_select_all, miasto_input, miasto_input_button,
-             stacje_w_miescie_select, wyszukaj_dane_button, alert,baza_danych_button
+             stacje_w_miescie_select, wyszukaj_dane_button, alert, baza_danych_button
              ],
     main=[main_layout],
     background_color='#dcf5d0',
