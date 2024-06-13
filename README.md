@@ -1,10 +1,9 @@
 # Jakość powietrza w Polsce 
 
-## Aplikacja webowa służaca do wyświetlania danych pomiarowych dotyczących jakości powietrza w Polsce
 
 ### Opis
 
-Program wykorzystuje framework Holovitz Panel do stworzenia aplikacji webowej, która pobiera dane z usługi REST, przetwarza otrzymaną odpowiedź oraz prezentuje dane w postaci dynamicznego dashboardu.
+Aplikacja służy do wyświetlania danych dla stacji pomiarowych dotyczących jakości powietrza w Polsce. Program wykorzystuje framework Holovitz Panel do stworzenia aplikacji webowej, która pobiera dane (usługa REST, baza danych), przetwarza otrzymaną odpowiedź oraz prezentuje dane w postaci dynamicznego dashboardu.
 
 ### Uruchamianie Aplikacji
 
