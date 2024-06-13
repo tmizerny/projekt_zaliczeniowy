@@ -44,16 +44,17 @@ def pobierz_dane(option, index=None):
     try:
         req = requests.get(request)
     except requests.exceptions.HTTPError as http_error:
-        http_error_message = f'[{http_error}] Błąd protokołu HTTP'
+        http_error_message = f'[{http_error}] Błąd protokołu HTTP. Spróbuj skorzystać z bazy danych'
         aktualizuj_alert(http_error_message)
     except requests.exceptions.ConnectionError as connection_error:
-        connection_error_message = f'[{connection_error}] Brak połącznia z serwisem GIOS '
+        connection_error_message = (f'[{connection_error}] Brak połącznia z serwisem GIOS. Spróbuj skorzystać z bazy'
+                                    f'danych')
         aktualizuj_alert(connection_error_message)
     except requests.exceptions.Timeout as timeout_error:
-        timeout_error_message = f'[{timeout_error}] Błąd odpowiedz od serwera'
+        timeout_error_message = f'[{timeout_error}] Błąd odpowiedz od serwera. Spróbuj skorzystać z bazy danych'
         aktualizuj_alert(timeout_error_message)
     except Exception as exp:
-        exp_message = f'[{exp}] Nieoczekiwany błąd. Spróbuj później'
+        exp_message = f'[{exp}] Nieoczekiwany błąd. Spróbuj lub spróbuj skorzystać z bazy danych'
         aktualizuj_alert(exp_message)
     else:
         return req.json()
