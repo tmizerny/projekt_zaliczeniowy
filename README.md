@@ -1,9 +1,15 @@
 # Jakość powietrza w Polsce 
 
-### Aplikacja webowa służaca do wyświetlania danych pomiarowych dotyczących jakości powietrza w Polsce
+## Aplikacja webowa służaca do wyświetlania danych pomiarowych dotyczących jakości powietrza w Polsce
 
+### Opis
 
-Aby uruchomić aplikację należy uruchomić lokalny host wpisująć w terminalu komendę: **panel serve app.py --autoreload**
+Program wykorzystuje framework Holovitz Panel do stworzenia aplikacji webowej, która pobiera dane z usługi REST, przetwarza otrzymaną odpowiedź oraz prezentuje dane w postaci dynamicznego dashboardu.
+
+### Uruchamianie aplikacji
+
+Aby uruchomić aplikację należy uruchomić lokalny host wpisująć w terminalu komendę: 
+**panel serve app.py --autoreload**
 
 Aplikacja **pobiera dane** z usługi REST prowadzonej prze GIOS. W przypadku braku połączenia z usługą program **obsługuje wyjątki** przy braku dostępności usługi czy braku łączności. Za wyświetlanie wiadomości error handlera odpowiedzialny jest widget z alertami.
 Użytkownik jest napierw poproszony o wybranie źródła danych. 
@@ -16,11 +22,13 @@ Po wybraniu stacji pomiarowej i wciśnięciu przycisku wczytaj dane dla stacji a
 - mapa lokalizacyjna stacji pomiarowej
 - krótki opis stacji pomiarowej zawierający najważniejsze informacje
 - menu select dostępnych dla stacji parametrów pomiarowych
-- wartości charakterystyczne dla danych pomiarowych
+- wartości charakterystyczne dla danych pomiarowych (indeks stacji oraz indeksy parametrów dynamicznie zmieniają kolor czcionki w zależności od jakości powietrza)
 - wykres słupkowy wraz z linią trendu dla danych pomiarowych
 - suwak DateTime umożliwiający przesunięcie zakresu danch na wykresie (przesunięcie slidera **dynamicznie aktualizuje** wykres oraz wartości charakterystyczne)
 
 Program umożliwia zapisanie danych w bazie danych ORM. Zgrywanie pomiarów dla **wszystkich** stacji pomiarowych trwa około 15 min. Postęp można śledzić w terminalu (pokazane jest dodawanie kolejnych stacji). 
 Użytkownika aplikacji webowej powiadamia alert wyświetlający informacje o zakończeniu dodawnia danych do bazy danych. 
 
-Program podzielony jest w miarę możliwości na moduły. Większa objętość głownego modułu programu app.py spowodowana jest brakiem możliwości modularyzacji inicjalizatorów widgetów oraz funkcji odwołujących się do funkcjonalności widgetów (obsługa eventów oraz zmiania atrybutów .value widgetów. Próba modularyzacji takiego kodu crashowała aplikacje. 
+Program podzielony jest w miarę możliwości na moduły. Większa objętość głownego modułu programu app.py spowodowana jest brakiem możliwości modularyzacji inicjalizatorów widgetów oraz funkcji odwołujących się do funkcjonalności widgetów (obsługa eventów oraz zmiania atrybutów .value widgetów). Próba modularyzacji takiego kodu crashowała aplikacje. 
+
+Aplikacja wyposażona jest w kilka testów jednostkowych testujących zgodność modelu danych z oczekiwanym.
