@@ -13,11 +13,11 @@ panel serve app.py --autoreload
 
 ### Funkcjonalności
 
--Pobieranie Danych: Aplikacja pobiera dane z usługi REST prowadzonej przez GIOS. W przypadku braku połączenia, obsługiwane są wyjątki.
--Wybór Źródła Danych: Użytkownik wybiera źródło danych (Usługa REST lub Baza danych)
--Lista Stacji: Użytkownik otrzymuje pełną listę nazw stacji w Polsce.
--Najbliższe Stacje: Użytkownik może sprawdzić listę najbliższych stacji pomiarowych w podanym promieniu. Aplikacja wyświetla mapę z naniesionymi stacjami oraz listę najbliższych stacji pomiarowych.
--Filtracja po Miejscowości: Aplikacja umożliwia wpisanie miejscowości, w której użytkownik chce znaleźć stacje pomiarowe, a następnie filtruje stacje do wybranego miasta.
+- Pobieranie Danych: Aplikacja pobiera dane z usługi REST prowadzonej przez GIOS. W przypadku braku połączenia, obsługiwane są wyjątki.
+- Wybór Źródła Danych: Użytkownik wybiera źródło danych (Usługa REST lub Baza danych)
+- Lista Stacji: Użytkownik otrzymuje pełną listę nazw stacji w Polsce.
+- Najbliższe Stacje: Użytkownik może sprawdzić listę najbliższych stacji pomiarowych w podanym promieniu. Aplikacja wyświetla mapę z naniesionymi stacjami oraz listę najbliższych stacji pomiarowych.
+- Filtracja po Miejscowości: Aplikacja umożliwia wpisanie miejscowości, w której użytkownik chce znaleźć stacje pomiarowe, a następnie filtruje stacje do wybranego miasta.
 
 ### Szczegóły Wybranej Stacji
 
